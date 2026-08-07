@@ -1,0 +1,29 @@
+{
+  "format": "ordinate-survey-v1",
+  "title": "Sample — the Kept Vale",
+  "ppm": 10,
+  "compass": 8,
+  "regions": [{ "id": "r1", "name": "The Kept Vale", "threat": 1, "hex": "#5e7a4e" }],
+  "nodes": [
+    { "id": "n0", "name": "The Ordinate", "kind": "ruin", "stone": "0", "region": "r1", "level": 5,
+      "origin": true, "seat": false, "x": 0, "y": 0, "services": {}, "notes": "Walled and emptied. Visible from Stone One's roofs." },
+    { "id": "n1", "name": "Stone One", "kind": "city", "stone": "1E", "region": "r1", "level": 1,
+      "origin": false, "seat": true, "x": 10, "y": 0,
+      "services": { "inn":1,"stable":1,"coach":1,"board":1,"office":1,"store":1,"provision":1,"smith":1,"apothecary":1,"market":1,"temple":1,"healer":1,"archive":1,"trainer":1,"reeve":1 },
+      "notes": "The living seat, a mile from the corpse of the old one." },
+    { "id": "n2", "name": "Ashfen", "kind": "town", "stone": "8SE", "region": "r1", "level": 1,
+      "x": 60, "y": 55, "services": { "inn":1,"board":1,"store":1,"provision":1,"smith":1,"market":1,"temple":1 }, "notes": "" },
+    { "id": "n3", "name": "Redgate", "kind": "village", "stone": "13NE", "region": "r1", "level": 2,
+      "x": 95, "y": -80, "services": { "inn":1,"board":1,"store":1,"provision":1 }, "notes": "" },
+    { "id": "n4", "name": "The Wash", "kind": "camp", "stone": "17SE", "region": "r1", "level": 2,
+      "x": 130, "y": 110, "services": { "inn":1 }, "notes": "A dry bank under a broken arch." }
+  ],
+  "roads": [
+    { "id": "e0", "from": "n1", "to": "n0", "miles": 1,  "milesLocked": true, "name": "The Approach", "density": "quiet",  "coach": false, "region": "r1", "pts": [] },
+    { "id": "e1", "from": "n1", "to": "n2", "miles": 8,  "milesLocked": true, "name": "The Fen Road",  "density": "normal", "coach": true,  "region": "r1", "pts": [{ "x": 32, "y": 10 }] },
+    { "id": "e2", "from": "n1", "to": "n3", "miles": 13, "milesLocked": true, "name": "The High Way",  "density": "quiet",  "coach": true,  "region": "r1", "pts": [] },
+    { "id": "e3", "from": "n2", "to": "n4", "miles": 9,  "milesLocked": true, "name": "",              "density": "dense",  "coach": false, "region": "r1", "pts": [{ "x": 100, "y": 95 }] },
+    { "id": "e4", "from": "n3", "to": "n4", "miles": 21, "milesLocked": true, "name": "The Long Round","density": "normal", "coach": true,  "region": "r1", "pts": [] }
+  ],
+  "shapes": []
+}
