@@ -235,6 +235,49 @@ p.note{font-family:var(--serif);font-size:14.5px;color:var(--ink-soft);margin:0 
   max-width:min(92vw,420px);text-align:center;box-shadow:0 5px 18px rgba(60,44,20,.35);
 }
 
+/* ── the roll modal ──────────────────────────────────────────── */
+.rollmask{
+  position:fixed;inset:0;z-index:70;background:rgba(40,30,14,.55);
+  display:grid;place-items:center;padding:20px;
+}
+.rollcard{
+  width:100%;max-width:340px;background:var(--paper-lit);
+  border:1px solid var(--ink);border-radius:4px;padding:18px 16px 14px;
+  box-shadow:0 12px 34px rgba(50,36,14,.45);
+}
+.rolleyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-faint);margin-bottom:8px;
+}
+.rollask{font-family:var(--mono);font-size:26px;letter-spacing:.02em;margin-bottom:6px}
+.rollnote{font-family:var(--serif);font-size:13px;color:var(--ink-soft);margin:0 0 12px;line-height:1.4}
+.rollboxes{display:flex;gap:9px;margin-bottom:12px}
+.rollboxes input{
+  flex:1;min-height:66px;background:var(--paper);border:1px solid var(--rule);border-radius:3px;
+  font-family:var(--mono);font-size:30px;text-align:center;padding:0;
+}
+.rollboxes input:focus{outline:1px solid var(--lead);border-color:var(--lead)}
+.rollsum{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:8px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin-bottom:4px;
+}
+.rollsum span:first-child{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.rolltotal{font-family:var(--mono);font-size:24px;color:var(--lead)}
+.rollcard .btn{margin-top:12px;margin-bottom:7px}
+
+/* ── the tray ────────────────────────────────────────────────── */
+.trayrow{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.trayrow button{
+  flex:1;min-width:64px;min-height:44px;border:1px solid var(--rule);border-radius:3px;
+  background:var(--paper-lit);font-family:var(--mono);font-size:14px;
+}
+.trayrow button:active{background:var(--paper-deep)}
+.trayout{
+  font-family:var(--mono);font-size:13px;color:var(--ink-soft);
+  border-left:2px solid var(--rule);padding:4px 0 4px 11px;margin-bottom:6px;
+}
+.trayout b{color:var(--ink);font-weight:600}
+
 /* ── tabs ────────────────────────────────────────────────────── */
 nav.tabs{
   position:fixed;left:0;right:0;bottom:0;z-index:20;

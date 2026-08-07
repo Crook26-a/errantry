@@ -13,6 +13,7 @@ import { nodeById } from "./travel.js";
 import { SURVEY, startNode, mapFor, reconcile, placeName } from "./content.js";
 import * as CU from "./charui.js";
 import * as MV from "./mapview.js";
+import * as RL from "./roller.js";
 import * as CH from "./character.js";
 import * as R from "./rules.js";
 import { mulberry } from "./dice.js";
@@ -180,6 +181,25 @@ on("walk", d => {
 
 on("resolve", () => { S.resolveEncounter(camp, { id: "stub" }); save(); render(); });
 
+on("rollmode", x => {
+  acc.rollMode = x.m === "hand" ? "hand" : "app";
+  RL.setMode(acc.rollMode);
+  save(); render();
+  toast(acc.rollMode === "hand" ? "The app will ask what your dice showed." : "The app will roll and show you the dice.");
+});
+
+/* The tray — any roll you want, through the same gate as everything else. */
+on("tray", async x => {
+  const r = await RL.ask({ expr: x.x, adv: x.adv || null, label: "The tray" });
+  const out = document.getElementById("trayOut");
+  if (!out) return;
+  const line = document.createElement("div");
+  line.className = "trayout";
+  line.innerHTML = `<b>${r.total}</b> &nbsp;${esc(x.x)}${x.adv ? " " + x.adv : ""} &nbsp;<span style="color:var(--ink-faint)">${r.dice.join(" ")}${r.byHand ? " · by hand" : ""}</span>`;
+  out.prepend(line);
+  while (out.children.length > 6) out.lastChild.remove();
+});
+
 on("mzoom", x => { MV.zoomBy(parseFloat(x.f) || 1); render(); });
 on("mfit", () => { MV.resetFit(); render(); });
 
@@ -191,7 +211,13 @@ on("turnback", async () => {
 });
 
 /* campaigns */
-on("newcamp", () => { draftPC = CU.blankDraft(); render(); });
+on("newcamp", () => {
+  draftPC = CU.blankDraft();
+  /* if you've said you roll your own, start there rather than making
+     you decline the app's offer every time */
+  if (acc.rollMode === "hand") draftPC.method = "own";
+  render();
+});
 
 /* ── signing on ────────────────────────────────────────────────
    Every action reads and writes `draftPC` and re-renders. Going back
@@ -203,10 +229,21 @@ on("cnext", () => {
   const i = steps.indexOf(d().step);
   if (i < steps.length - 1) { d().step = steps[i + 1]; render(); }
 });
+/* Back should undo the most recent decision, not leap over it. On the
+   abilities step that means peeling off the scores before the method,
+   and the method before leaving the step at all. */
 on("cback", () => {
-  const steps = CU.stepsFor(d());
-  const i = steps.indexOf(d().step);
-  if (i > 0) { d().step = steps[i - 1]; render(); }
+  const dr = d();
+  if (dr.step === "abilities") {
+    if (dr.pool.length) {                      // placed or placing → back to entry/chooser
+      if (dr.method === "own" || dr.method === "real") { dr.pool = []; dr.assign = {}; dr.holding = null; dr.bonus = {}; render(); return; }
+      dr.method = null; dr.pool = []; dr.assign = {}; dr.holding = null; dr.bonus = {}; render(); return;
+    }
+    if (dr.method) { dr.method = null; render(); return; }   // entry screen → chooser
+  }
+  const steps = CU.stepsFor(dr);
+  const i = steps.indexOf(dr.step);
+  if (i > 0) { dr.step = steps[i - 1]; render(); }
   else { draftPC = null; render(); }
 });
 on("canc", x => {
@@ -227,10 +264,11 @@ on("cchoice", x => { d().choice[x.k] = x.id; render(); });
 
 on("cmethod", x => {
   d().method = x.m || null;
-  if (!x.m) { d().pool = []; d().assign = {}; d().holding = null; render(); return; }
+  if (!x.m) { d().pool = []; d().assign = {}; d().holding = null; d().bonus = {}; render(); return; }
   d().assign = {}; d().holding = null; d().bonus = {};
   if (x.m === "array") d().pool = [...CH.STANDARD_ARRAY];
   else if (x.m === "roll") { const a = CH.rollArray(); d().pool = a.scores; d().rolls = a.rolls; }
+  else if (x.m === "own") { /* six boxes; nothing to pre-roll */ }
   else d().pool = [];
   render();
 });
@@ -243,7 +281,17 @@ on("cown", () => {
   d().assign = {}; d().holding = null;
   render();
 });
-on("cownagain", () => { d().pool = []; d().assign = {}; d().holding = null; render(); });
+on("cownagain", () => { d().pool = []; d().assign = {}; d().holding = null; d().bonus = {}; render(); });
+on("crealagain", () => { d().pool = []; d().assign = {}; d().holding = null; d().bonus = {}; render(); });
+
+/* Empty every slot without losing the scores themselves. */
+on("cclear", () => {
+  const fixedStr = d().method === "real";
+  d().assign = fixedStr ? { str: 0 } : {};
+  d().holding = null;
+  d().bonus = {};
+  render();
+});
 
 /* Straight down the sheet in the order they came off the table. */
 on("corder", () => {
@@ -424,6 +472,7 @@ function ownTotals() {
 async function boot() {
   window.__storeName = store.backendName();
   acc = await S.loadAccount();
+  RL.setMode(acc.rollMode || "app");
 
   if (acc.activeCampaign) camp = await S.loadCampaign(acc.activeCampaign);
   if (!camp && acc.campaigns.length) {

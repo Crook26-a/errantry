@@ -158,7 +158,8 @@ function stepAbilities(d) {
       <div class="field"><label>Most you can lift (lb)</label><input id="cLift" inputmode="numeric" value="${esc(d.real.liftLb)}" placeholder="185"></div>
     </div>
     <p class="note" style="font-size:13px">Deadlift, a loaded barbell, one end of a sofa — whatever you'd actually trust yourself to pick up once. An honest guess is fine.</p>
-    <button class="btn primary" data-act="creal" style="text-align:center">Take the measure</button>`;
+    <button class="btn primary" data-act="creal" style="text-align:center">Take the measure</button>
+    <button class="btn quiet" data-act="cmethod" data-m="" style="text-align:center">Choose a different way</button>`;
 
   const scores = R.ABILITIES.map(a => {
     const idx = d.assign[a.id];
@@ -168,12 +169,13 @@ function stepAbilities(d) {
     return { a, rolled, bump, total, idx };
   });
   const done = scores.every(s => s.rolled != null);
+  const placedCount = scores.filter(s => s.rolled != null && !(d.method === "real" && s.a.id === "str")).length;
   const extra = anc.extraASI;
   const bonusLeft = extra ? extra.n - Object.values(d.bonus).reduce((s, v) => s + v, 0) : 0;
 
   return `
     <h2 class="head">Place them</h2>
-    <p class="note">${d.method === "real" ? "Strength is fixed by your own measure. Tap a score, then tap where it goes." : "Tap a score, then tap where it goes."} ${esc(cls.name)}s want ${cls.primary.map(p => R.ABILITIES.find(a => a.id === p).name).join(" and ")}.</p>
+    <p class="note">${d.method === "real" ? "Strength is fixed by your own measure. Tap a score, then tap where it goes." : "Tap a score, then tap where it goes."} ${esc(cls.name)}s want ${cls.primary.map(p => R.ABILITIES.find(a => a.id === p).name).join(" and ")}.${placedCount ? " Tap a filled line to take that score back." : ""}</p>
 
     ${left.length ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">${
       d.pool.map((v, i) => placed.includes(i) ? "" :
@@ -201,7 +203,11 @@ function stepAbilities(d) {
       }</div>` : ""}
 
     ${d.method === "roll" ? `<button class="btn quiet" data-act="creroll" style="text-align:center;margin-top:10px">Roll a fresh set</button>` : ""}
-    ${d.method === "own" ? `<button class="btn quiet" data-act="cownagain" style="text-align:center">Type different scores</button>` : ""}
+    ${d.method === "own" ? `<button class="btn quiet" data-act="cownagain" style="text-align:center;margin-top:10px">Type different scores</button>` : ""}
+    ${d.method === "real" ? `<button class="btn quiet" data-act="crealagain" style="text-align:center;margin-top:10px">Change your measure</button>` : ""}
+    ${placedCount ? `<button class="btn quiet" data-act="cclear" style="text-align:center">Take them all back</button>` : ""}
+    <button class="btn quiet" data-act="cmethod" data-m="" style="text-align:center">Choose a different way
+      <span class="sub" style="text-align:center">Rolled, standard array, your own dice, or your own body</span></button>
     <button class="btn primary" data-act="cnext" ${done && bonusLeft === 0 ? "" : "disabled"} style="margin-top:10px;text-align:center">Carry on</button>`;
 }
 

@@ -250,6 +250,18 @@ export function bookScreen(acc, camp) {
     }).join("")}
     <div class="stat" style="margin-top:14px"><span class="k">Bank capacity earned</span><span class="v">${bankCap(acc.lifetimeMiles)} <small>mi</small></span></div>
 
+    <p class="eyebrow">The tray</p>
+    <p class="note">Anything you need rolled that the game hasn't asked for.</p>
+    <div class="trayrow">
+      ${["1d20", "1d4", "1d6", "1d8", "1d10", "1d12", "2d6", "4d6"].map(x =>
+        `<button data-act="tray" data-x="${x}">${x}</button>`).join("")}
+    </div>
+    <div class="trayrow">
+      <button data-act="tray" data-x="1d20" data-adv="adv">d20 adv</button>
+      <button data-act="tray" data-x="1d20" data-adv="dis">d20 dis</button>
+    </div>
+    <div id="trayOut"></div>
+
     <p class="eyebrow">The road log</p>
     ${camp && camp.log.length ? camp.log.slice(0, 40).map(l => `
       <div class="entry"><span class="d">Day ${l.day}</span><span class="s" style="flex:1">${esc(l.text)}</span></div>
@@ -300,6 +312,13 @@ export function settingsScreen(acc, camp, map) {
       <div class="field" style="margin-top:12px"><label>Survey JSON</label><textarea id="mapPaste" spellcheck="false" placeholder="Exported JSON from the plotting table"></textarea></div>
       <button class="btn" data-act="loadmap">Use this survey</button>
     </div>
+
+    <p class="eyebrow">The dice</p>
+    <p class="note">Every roll the game makes can go either way — it rolls and tells you, or it tells you what to roll and waits while you find your d20.</p>
+    <button class="btn ${acc.rollMode !== "hand" ? "on" : ""}" data-act="rollmode" data-m="app">The app rolls
+      <span class="sub">Fast, and it shows you the dice it threw.</span></button>
+    <button class="btn ${acc.rollMode === "hand" ? "on" : ""}" data-act="rollmode" data-m="hand">You roll
+      <span class="sub">The app asks for what your dice showed and does the arithmetic. There's always an escape if you don't have them on you.</span></button>
 
     <p class="eyebrow">Your stride</p>
     <p class="note">Pedometers count steps, not miles. Your height sets how many steps make one.</p>

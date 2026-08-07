@@ -46,6 +46,7 @@ export function blankAccount() {
     v: 1,
     lifetimeMiles: 0,
     stepsPerMile: STEPS_PER_MILE,
+    rollMode: "app",        // "app" or "hand" — who rolls the dice
     entries: [],            // {id, date, miles, source, campaignId, banked}
     campaigns: [],          // {id, name, deathMode, created, mapTitle}
     activeCampaign: null

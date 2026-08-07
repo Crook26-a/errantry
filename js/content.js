@@ -18,7 +18,7 @@
      gate  — somewhere you can see on the map and cannot walk into.
    ════════════════════════════════════════════════════════════════ */
 
-export const BUILD = "2026-08-07 · 7";
+export const BUILD = "2026-08-07 · 9";
 
 export const SURVEY = {
     format: "ordinate-survey-v1",
