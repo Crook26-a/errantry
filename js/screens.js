@@ -8,8 +8,9 @@
    ════════════════════════════════════════════════════════════════ */
 
 import { esc, mi, gauge, emptyState, ICON } from "./ui.js";
-import { CONDITIONING, bankCap, earnedPerks, nextPerk, recentDays } from "./state.js";
+import { CONDITIONING, bankCap, nextPerk, recentDays } from "./state.js";
 import { RIDE, roadsFrom, otherEnd, nodeById, remaining, fraction } from "./travel.js";
+import { placeName, BUILD } from "./content.js";
 
 const r1 = v => Math.round(v * 10) / 10;
 
@@ -35,7 +36,7 @@ export function bankScreen(acc, camp, draft) {
       </div>
     </div>
 
-    ${!camp ? `<p class="note">No campaign is running, so miles you log will count toward conditioning but have nowhere to bank. Start one under Settings.</p>` : ""}
+    ${!camp ? `<p class="note">No campaign is running, so miles you log count toward conditioning but have nowhere to bank. Take up a warrant under Road.</p>` : ""}
     ${full ? `<p class="note" style="color:var(--lead)">The bank is full. Keep walking — the miles still ratchet your conditioning — but spend some before they stop banking.</p>` : ""}
 
     <p class="eyebrow">Log what you walked</p>
@@ -74,62 +75,69 @@ export function bankScreen(acc, camp, draft) {
 }
 
 /* ══════════════════════════ MAP / ROAD ════════════════════════ */
-export function mapScreen(acc, camp) {
-  if (!camp) return `<div class="screen">${emptyState("No campaign.", "Start one under Settings.")}</div>`;
-  if (!camp.map || !camp.map.nodes || !camp.map.nodes.length) {
+export function mapScreen(acc, camp, map) {
+  if (!camp) {
     return `<div class="screen">
-      <h2 class="head">No survey loaded</h2>
-      <p class="note">This campaign has no map yet. Export a survey from the plotting table and paste it in.</p>
-      <div class="field"><label>Survey JSON</label><textarea id="mapPaste" spellcheck="false" placeholder="Paste the exported survey here"></textarea></div>
-      <button class="btn primary" data-act="loadmap">Load the survey</button>
+      <h2 class="head">No warrant yet</h2>
+      <p class="note">The Errantry doesn't hand parcels to nobody in particular. Sign on, and the roads open.</p>
+      <button class="btn primary" data-act="newcamp" style="text-align:center">Sign on as a carrier</button>
     </div>`;
   }
-  return camp.journey ? roadView(camp) : townView(camp);
+  return camp.journey ? roadView(camp, map) : townView(camp, map);
 }
 
-function townView(camp) {
-  const map = camp.map;
+function townView(camp, map) {
   const here = nodeById(map, camp.at);
-  if (!here) return `<div class="screen">${emptyState("Lost.", "This campaign's position isn't on the survey. Reload the map in Settings.")}</div>`;
+  if (!here) return `<div class="screen">${emptyState("Nowhere.", "This carrier isn't standing on the survey. Settings can set you down again.")}</div>`;
 
-  const out = roadsFrom(map, here.id).map(road => {
-    const dest = nodeById(map, otherEnd(road, here.id));
-    return { road, dest };
-  }).sort((a, b) => a.road.miles - b.road.miles);
+  const out = roadsFrom(map, here.id)
+    .map(road => ({ road, dest: nodeById(map, otherEnd(road, here.id)) }))
+    .filter(o => o.dest)
+    .sort((a, b) => a.road.miles - b.road.miles);
 
-  const svcList = Object.entries(here.services || {}).filter(([, v]) => v)
-    .map(([k]) => SERVICE_NAME[k] || k);
+  const svcList = Object.entries(here.services || {}).filter(([, v]) => v).map(([k]) => SERVICE_NAME[k] || k);
 
   return `
   <div class="screen">
     <div style="text-align:center;padding:6px 0 18px;border-bottom:1px solid var(--rule);margin-bottom:18px">
-      <div style="font-family:var(--mono);font-size:13px;color:var(--lead);letter-spacing:.1em">${esc(here.stone ?? "—")}</div>
-      <div style="font-family:var(--serif);font-size:26px;margin-top:2px">${esc(here.name || "Unnamed")}</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--lead);letter-spacing:.1em">${esc(here.stone == null ? "—" : here.stone)}</div>
+      <div style="font-family:var(--serif);font-size:26px;margin-top:2px">${esc(placeName(here))}</div>
       <div style="font-size:11px;color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase;margin-top:6px">
         Day ${camp.day} · ${mi(camp.bank)} mi banked
       </div>
     </div>
 
+    ${here.notes ? `<p class="note" style="font-style:italic">${esc(here.notes)}</p>` : ""}
     ${svcList.length ? `<div style="margin-bottom:20px">${svcList.map(s => `<span class="tag">${esc(s)}</span>`).join("")}</div>` : ""}
 
     <p class="eyebrow">Roads out</p>
     ${out.length ? out.map(({ road, dest }) => {
+      /* A gated place is visible and unreachable — the map should show
+         you the wall, not pretend the road isn't there. */
+      if (dest.gate) return `<button class="btn" disabled>
+        ${esc(placeName(dest))} <span class="r">shut</span>
+        <span class="sub">${esc(dest.gate.note || "The way is shut.")}</span></button>`;
+
       const enough = camp.bank >= road.miles;
+      const cleared = camp.cleared && camp.cleared[dest.id];
+      const flavour = road.name || (road.density === "dense" ? "a hard road"
+                    : road.density === "quiet" ? "a quiet road" : "the road");
+      const mark = dest.site && !cleared ? `<span class="tag lead">unquiet</span> ` : "";
       return `<button class="btn" data-act="depart" data-road="${esc(road.id)}">
-        ${esc(dest.name || "onward")}
+        ${esc(placeName(dest))}
         <span class="r">${mi(road.miles)} mi</span>
-        <span class="sub">${esc(road.name || (road.density === "dense" ? "a hard road" : road.density === "quiet" ? "a quiet road" : "the road"))}${enough ? "" : ` — you're ${mi(road.miles - camp.bank)} short`}</span>
+        <span class="sub">${mark}${esc(flavour)}${enough ? "" : ` — you're ${mi(road.miles - camp.bank)} short`}</span>
       </button>`;
     }).join("") : `<p class="note">No road leaves this place.</p>`}
   </div>`;
 }
 
-function roadView(camp) {
-  const j = camp.journey, map = camp.map;
+function roadView(camp, map) {
+  const j = camp.journey;
   const from = nodeById(map, j.fromId), to = nodeById(map, j.toId);
   const left = remaining(j);
   const pct = (fraction(j) * 100).toFixed(1);
-  const canWalk = Math.min(camp.bank, left);
+  const canWalk = r1(Math.min(camp.bank, left));
   const dry = camp.bank < 0.05;
 
   if (j.pending) {
@@ -137,7 +145,7 @@ function roadView(camp) {
       <p class="eyebrow">On the road · mile ${mi(j.progress)}</p>
       <div class="card">
         <h3>Something on the road</h3>
-        <p>The encounter layer isn't built yet — this is where the road interrupts you. For now you can note it and walk on.</p>
+        <p>The encounter layer isn't built yet — this is where the road interrupts you. For now, note it and walk on.</p>
         <button class="btn primary" data-act="resolve">Deal with it and walk on</button>
       </div>
     </div>`;
@@ -147,8 +155,8 @@ function roadView(camp) {
   <div class="screen">
     <div class="roadline">
       <div class="ends">
-        <span>${esc(from ? from.name : "?")}</span>
-        <span class="to">${esc(to ? to.name : "?")}</span>
+        <span>${esc(placeName(from))}</span>
+        <span class="to">${esc(placeName(to))}</span>
       </div>
       <div class="track">
         <i style="width:${pct}%"></i>
@@ -190,7 +198,6 @@ const SERVICE_NAME = {
 
 /* ══════════════════════════ THE BOOK ══════════════════════════ */
 export function bookScreen(acc, camp) {
-  const earned = earnedPerks(acc.lifetimeMiles);
   return `
   <div class="screen">
     <p class="eyebrow">Conditioning</p>
@@ -212,14 +219,23 @@ export function bookScreen(acc, camp) {
 }
 
 /* ══════════════════════════ SETTINGS ══════════════════════════ */
-export function settingsScreen(acc, camp) {
-  const DEATH = {
-    unbonded: ["Unbonded", "You carry your own risk. If you die, the campaign ends."],
-    bonded: ["Bonded", "The Errantry recovers you. Walking back out to where you fell is your own obligation — half the miles the first time, then a quarter, then a tenth."],
-    insured: ["Insured", "The guild eats the loss. Death costs coin instead of miles."]
-  };
+const DEATH = {
+  unbonded: ["Unbonded", "You carry your own risk. If you die, the campaign ends."],
+  bonded: ["Bonded", "The Errantry recovers you. Walking back out to where you fell is your own obligation — half the miles the first time, then a quarter, then a tenth."],
+  insured: ["Insured", "The guild eats the loss. Death costs coin instead of miles."]
+};
+
+export function settingsScreen(acc, camp, map) {
+  const isOverride = !!(camp && camp.mapOverride && camp.mapOverride.nodes && camp.mapOverride.nodes.length);
+  const totalMiles = mi((map.roads || []).reduce((s, r) => s + r.miles, 0));
+
   return `
   <div class="screen">
+    <div style="text-align:center;padding:2px 0 14px;border-bottom:1px solid var(--rule);margin-bottom:16px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)">Build</div>
+      <div style="font-family:var(--mono);font-size:15px;margin-top:3px">${esc(BUILD)}</div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:5px">If this doesn't match what you were told to expect, the phone is holding an old copy.</div>
+    </div>
     <p class="eyebrow">Campaign</p>
     ${camp ? `
       <div class="card">
@@ -227,16 +243,24 @@ export function settingsScreen(acc, camp) {
         <p><span class="tag">${esc(DEATH[camp.deathMode][0])}</span> Day ${camp.day} · ${mi(camp.bank)} mi banked</p>
         <p style="font-size:13px">${esc(DEATH[camp.deathMode][1])}</p>
       </div>` : `<p class="note">No campaign is running.</p>`}
-    ${acc.campaigns.length > 1 ? acc.campaigns.filter(c => c.id !== acc.activeCampaign).map(c => `
+    ${acc.campaigns.filter(c => c.id !== acc.activeCampaign).map(c => `
       <button class="btn" data-act="switch" data-id="${esc(c.id)}">Switch to ${esc(c.name)}
-        <span class="sub">Miles you log go to whichever campaign is running</span></button>`).join("") : ""}
+        <span class="sub">Miles you log go to whichever campaign is running</span></button>`).join("")}
     <button class="btn" data-act="newcamp">Start a new campaign</button>
 
     <p class="eyebrow">The survey</p>
-    ${camp && camp.map ? `<div class="stat"><span class="k">${esc(camp.map.title || "Loaded")}</span><span class="v">${camp.map.nodes.length} <small>places</small></span></div>
-      <div class="stat"><span class="k">Road laid</span><span class="v">${mi((camp.map.roads || []).reduce((s, r) => s + r.miles, 0))} <small>mi</small></span></div>` : `<p class="note">No survey loaded.</p>`}
-    <div class="field" style="margin-top:12px"><label>Paste a survey to load or replace</label><textarea id="mapPaste" spellcheck="false" placeholder="Exported JSON from the plotting table"></textarea></div>
-    <button class="btn" data-act="loadmap">Load the survey</button>
+    <div class="stat"><span class="k">${esc(map.title || "Untitled")}</span><span class="v">${map.nodes.length} <small>places</small></span></div>
+    <div class="stat"><span class="k">Road laid</span><span class="v">${totalMiles} <small>mi</small></span></div>
+    <div class="stat"><span class="k">Source</span><span class="v" style="font-size:12px">${isOverride ? "pasted in" : "ships with the app"}</span></div>
+    <p class="note" style="margin-top:12px">${isOverride
+      ? "This campaign is using a survey you pasted in, so it won't pick up map updates until you drop back to the shipped one."
+      : "The map comes with the app, so updates reach a campaign already in progress."}</p>
+    <button class="btn quiet" data-act="showpaste">Paste a survey to test with</button>
+    ${isOverride ? `<button class="btn danger" data-act="dropoverride">Go back to the shipped survey</button>` : ""}
+    <div id="pasteBox" hidden>
+      <div class="field" style="margin-top:12px"><label>Survey JSON</label><textarea id="mapPaste" spellcheck="false" placeholder="Exported JSON from the plotting table"></textarea></div>
+      <button class="btn" data-act="loadmap">Use this survey</button>
+    </div>
 
     <p class="eyebrow">Your stride</p>
     <p class="note">Pedometers count steps, not miles. Your height sets how many steps make one.</p>
@@ -248,8 +272,9 @@ export function settingsScreen(acc, camp) {
 
     <p class="eyebrow">Keeping it</p>
     <div class="stat"><span class="k">Storage</span><span class="v" style="font-size:12px">${esc(window.__storeName || "—")}</span></div>
+    <p class="note" style="margin-top:10px">Your walked miles live on this phone only. Export before you rely on them.</p>
     <button class="btn" data-act="export">Export everything</button>
-    <button class="btn danger" data-act="wipe">Erase this campaign</button>
+    ${camp ? `<button class="btn danger" data-act="wipe">Erase this campaign</button>` : ""}
   </div>`;
 }
 

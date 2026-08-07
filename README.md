@@ -26,10 +26,16 @@ them; only the install prompt is affected.
     css/app.css           parchment, thumb-first
     js/store.js           persistence, with fallbacks
     js/travel.js          the road — pure, testable, no imports
+    js/content.js         THE MAP, and everything else the world is made of
+    js/dice.js            rolling — pure, seedable
+    js/loot.js            purse categories, item tiers, weight
+    js/rules.js           SRD 5.1 data: ancestries, classes, spells
+    js/character.js       making a character, and every derived number
+    js/charui.js          the creation flow and the sheet
     js/state.js           account + campaign model, the mile bank
     js/screens.js         views (return HTML strings)
     js/main.js            boot, routing, every mutation
-    data/                 content
+    data/                 survey exports, kept for reference
 
 ## The two tiers
 
@@ -46,15 +52,27 @@ They can't be in two places at once.
 - Mile bank with a cap that grows as conditioning earns it
 - Overflow past the cap still counts toward conditioning, so walking is never wasted
 - Steps→miles, calibrated by height
-- Loading a survey exported from the plotting table
+- The map ships inside the app — nothing to load, nothing to paste
+- A campaign stores only where it is, so map updates reach a character
+  already walking; roads that move or vanish are reconciled on launch
 - Travel: departing, walking down a road, arriving, turning back
 - Encounters fire at the right intervals — the content behind them is stubbed
 - Running the bank dry mid-road leaves you camped; nothing decays while you're gone
 
+- Character creation: nine ancestries, five classes, rolled or standard or
+  your own body, prior trades, skills, spells, and the warrant
+- The character sheet, with everything derived rather than stored
+- Loot: five purse categories that scale by region, four item tiers, weight
+
 ## What isn't
 
-Character creation, the 5e rules engine, combat, encounter content, contracts,
-inventory and encumbrance, coaches, death modes, quests.
+Combat, encounter content, contracts, shops, levelling choices, coaches,
+death resolution, quests, reputation.
+
+## Licence
+
+This work includes material from the SRD 5.1 by Wizards of the Coast LLC,
+licensed under CC-BY-4.0. See ATTRIBUTION in js/rules.js.
 
 ## Testing the travel engine
 

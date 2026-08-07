@@ -87,12 +87,14 @@ export function blankCampaign(name, deathMode) {
     name: name || "A carrier",
     deathMode: deathMode || "bonded",   // unbonded | bonded | insured
     created: today(),
+    pc: null,          // the character sheet
     bank: 0,
     day: 1,
     at: null,          // node id, when standing still
     journey: null,     // set while on a road
     map: null,         // the survey, pasted in
     flags: {},
+    cleared: {},       // sites dealt with
     log: []            // road log, newest first
   };
 }
