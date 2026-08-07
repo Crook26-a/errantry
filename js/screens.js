@@ -11,6 +11,7 @@ import { esc, mi, gauge, emptyState, ICON } from "./ui.js";
 import { CONDITIONING, bankCap, nextPerk, recentDays } from "./state.js";
 import { RIDE, roadsFrom, otherEnd, nodeById, remaining, fraction } from "./travel.js";
 import { placeName, BUILD } from "./content.js";
+import * as MV from "./mapview.js";
 
 const r1 = v => Math.round(v * 10) / 10;
 
@@ -75,6 +76,19 @@ export function bankScreen(acc, camp, draft) {
 }
 
 /* ══════════════════════════ MAP / ROAD ════════════════════════ */
+function mapPanel(map, camp) {
+  const w = Math.min(640, (typeof innerWidth === "number" ? innerWidth : 380));
+  const h = Math.max(230, Math.round((typeof innerHeight === "number" ? innerHeight : 600) * 0.40));
+  return `<div class="mapwrap" style="height:${h}px">
+    ${MV.mapSVG(map, camp, w, h)}
+    <div class="mapctl">
+      <button data-act="mzoom" data-f="1.4" aria-label="Zoom in">+</button>
+      <button data-act="mzoom" data-f="0.71" aria-label="Zoom out">−</button>
+      <button data-act="mfit" aria-label="Fit the whole survey">⤢</button>
+    </div>
+  </div>`;
+}
+
 export function mapScreen(acc, camp, map) {
   if (!camp) {
     return `<div class="screen">
@@ -84,6 +98,26 @@ export function mapScreen(acc, camp, map) {
     </div>`;
   }
   return camp.journey ? roadView(camp, map) : townView(camp, map);
+}
+
+/* A place tapped on the map, shown as a card so the map itself stays
+   uncluttered. Anything reachable from here offers the road. */
+function focusCard(map, camp, node) {
+  if (!node) return "";
+  const road = roadsFrom(map, camp.at).find(r => otherEnd(r, camp.at) === node.id);
+  const here = node.id === camp.at;
+  const been = camp.visited && camp.visited[node.id];
+  const svc = Object.entries(node.services || {}).filter(([, v]) => v).map(([k]) => SERVICE_NAME[k] || k);
+  return `<div class="card">
+    <h3>${esc(placeName(node))}${node.stone ? ` <span class="tag">${esc(node.stone)}</span>` : ""}</h3>
+    ${node.gate ? `<p>${esc(node.gate.note)}</p>`
+      : here ? `<p>You're standing in it.</p>`
+      : road ? `<p>${mi(road.miles)} miles by ${esc(road.name || "the road")}${been ? ", and you've walked it" : ""}.</p>`
+      : `<p>No road from here. ${been ? "You've been." : "You haven't been."}</p>`}
+    ${svc.length && (been || here) ? `<p>${svc.map(x => `<span class="tag">${esc(x)}</span>`).join("")}</p>` : ""}
+    ${road && !node.gate && !here ? `<button class="btn primary" data-act="depart" data-road="${esc(road.id)}" style="text-align:center;margin:0">
+      Set out <span class="r">${mi(road.miles)} mi</span></button>` : ""}
+  </div>`;
 }
 
 function townView(camp, map) {
@@ -97,8 +131,12 @@ function townView(camp, map) {
 
   const svcList = Object.entries(here.services || {}).filter(([, v]) => v).map(([k]) => SERVICE_NAME[k] || k);
 
+  const focus = camp.focus && camp.focus !== camp.at ? nodeById(map, camp.focus) : null;
+
   return `
-  <div class="screen">
+  <div class="screen" style="padding-top:0">
+    ${mapPanel(map, camp)}
+    ${focus ? focusCard(map, camp, focus) : ""}
     <div style="text-align:center;padding:6px 0 18px;border-bottom:1px solid var(--rule);margin-bottom:18px">
       <div style="font-family:var(--mono);font-size:13px;color:var(--lead);letter-spacing:.1em">${esc(here.stone == null ? "—" : here.stone)}</div>
       <div style="font-family:var(--serif);font-size:26px;margin-top:2px">${esc(placeName(here))}</div>
@@ -152,7 +190,8 @@ function roadView(camp, map) {
   }
 
   return `
-  <div class="screen">
+  <div class="screen" style="padding-top:0">
+    ${mapPanel(map, camp)}
     <div class="roadline">
       <div class="ends">
         <span>${esc(placeName(from))}</span>

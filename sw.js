@@ -14,7 +14,7 @@ const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest", "./css/app.css",
   "./js/main.js", "./js/state.js", "./js/store.js", "./js/travel.js",
   "./js/ui.js", "./js/screens.js", "./js/content.js",
-  "./js/dice.js", "./js/loot.js", "./js/rules.js", "./js/character.js", "./js/charui.js",
+  "./js/dice.js", "./js/loot.js", "./js/rules.js", "./js/character.js", "./js/charui.js", "./js/mapview.js",
   "./icon-192.png", "./icon-512.png", "./icon-512-maskable.png"
 ];
 

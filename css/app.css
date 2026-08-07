@@ -44,7 +44,10 @@ button{cursor:pointer}
   padding:0 0 calc(var(--tabh) + env(safe-area-inset-bottom,0px));
   max-width:640px;margin:0 auto;
 }
-.screen{padding:14px 16px 28px;animation:rise .18s ease-out}
+.screen{padding:14px 16px 28px}
+/* Only a real change of screen animates. Re-rendering after a tap must
+   be invisible, or every choice looks like the page reloading. */
+.screen.fresh{animation:rise .18s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 header.top{
@@ -105,6 +108,38 @@ p.note{font-family:var(--serif);font-size:14.5px;color:var(--ink-soft);margin:0 
 .btn.primary .sub{color:var(--paper-deep)}
 .btn:focus-visible{outline:2px solid var(--lead);outline-offset:2px}
 
+/* chosen */
+.btn.on{
+  border-color:var(--lead);
+  background:var(--paper-deep);
+  box-shadow:inset 3px 0 0 0 var(--lead);
+  padding-left:17px;
+}
+.btn.on::after{
+  content:"";position:absolute;top:14px;right:14px;
+  width:7px;height:12px;border:solid var(--lead);border-width:0 2px 2px 0;
+  transform:rotate(42deg);
+}
+.btn.on.hascount::after{display:none}
+.btn{position:relative}
+.btn.on .r{color:var(--lead)}
+
+/* a place a held score can go */
+.btn.target{
+  border-style:dashed;border-color:var(--lead-soft);
+  background:none;color:var(--ink-soft);
+}
+
+/* the loose score chips waiting to be placed */
+.chip{
+  min-width:58px;min-height:52px;margin:0;padding:8px 10px;
+  border:1px solid var(--rule);border-radius:3px;background:var(--paper-lit);
+  font-family:var(--mono);font-size:19px;text-align:center;
+}
+.chip:active{background:var(--paper-deep)}
+.chip.on{background:var(--ink);color:var(--paper-lit);border-color:var(--ink)}
+.chip:focus-visible{outline:2px solid var(--lead);outline-offset:2px}
+
 .row{display:flex;gap:9px}
 .row>*{flex:1}
 
@@ -161,6 +196,20 @@ p.note{font-family:var(--serif);font-size:14.5px;color:var(--ink-soft);margin:0 
   border-radius:2px;padding:2px 6px;margin-right:5px;
 }
 .tag.lead{color:var(--lead);border-color:var(--lead-soft)}
+
+/* ── the map ─────────────────────────────────────────────────── */
+.mapwrap{
+  position:relative;margin:0 -16px 16px;overflow:hidden;
+  border-bottom:1px solid var(--ink);background:var(--paper);
+}
+.mapwrap svg{display:block}
+.mapctl{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:5px}
+.mapctl button{
+  width:36px;height:36px;border:1px solid var(--ink);border-radius:3px;
+  background:var(--paper-lit);font-size:17px;line-height:1;
+  display:grid;place-items:center;opacity:.94;
+}
+.mapctl button:active{background:var(--paper-deep)}
 
 /* ── the road ────────────────────────────────────────────────── */
 .roadline{margin:20px 0 8px}

@@ -12,6 +12,7 @@ import { bankScreen, mapScreen, bookScreen, settingsScreen, tabs } from "./scree
 import { nodeById } from "./travel.js";
 import { SURVEY, startNode, mapFor, reconcile, placeName } from "./content.js";
 import * as CU from "./charui.js";
+import * as MV from "./mapview.js";
 import * as CH from "./character.js";
 import * as R from "./rules.js";
 import { mulberry } from "./dice.js";
@@ -27,32 +28,64 @@ let draftPC = null;      // creation in progress
 
 const map = () => mapFor(camp);
 
-/* ── render ───────────────────────────────────────────────────── */
+/* ── render ───────────────────────────────────────────────────
+   Screens are rebuilt wholesale, which is fine at this size — but a
+   rebuild must be INVISIBLE. Two things make it visible if you let
+   them: the entrance animation replaying, and the scroll position
+   snapping to the top. Both are handled by asking whether this is the
+   same screen as last time. Tapping a skill halfway down a long list
+   should change nothing but that skill. */
+let lastView = null;
+
+function viewKey() {
+  if (draftPC) return "create:" + draftPC.step + ":" + (draftPC.method || "") + ":" + (draftPC.pool.length ? "placed" : "pick");
+  if (tab === "map") return "map:" + (camp && camp.journey ? (camp.journey.pending ? "event" : "road") : "town");
+  return "tab:" + tab;
+}
+
 function render() {
   const m = map();
+  const key = viewKey();
+  const same = key === lastView;
+  const y = same ? window.scrollY : 0;
+
+  let html;
   if (draftPC) {
-    $("#app").innerHTML =
-      `<header class="top"><h1>Errantry</h1><span class="sub">signing on</span></header>` +
-      CU.createScreen(draftPC);
-    return;
+    html = `<header class="top"><h1>Errantry</h1><span class="sub">signing on</span></header>` +
+           CU.createScreen(draftPC);
+  } else {
+    const body =
+      tab === "bank" ? bankScreen(acc, camp, draft) :
+      tab === "map"  ? mapScreen(acc, camp, m) :
+      tab === "book" ? (camp && camp.pc ? CU.sheetScreen(camp.pc) : bookScreen(acc, camp)) :
+                       settingsScreen(acc, camp, m);
+    const where = camp && camp.at ? placeName(nodeById(m, camp.at))
+                : camp && camp.journey ? "on the road"
+                : camp ? camp.name : "";
+    html = `<header class="top"><h1>Errantry</h1><span class="sub">${esc(where || "")}</span></header>` +
+           body + tabs(tab);
   }
-  const body =
-    tab === "bank" ? bankScreen(acc, camp, draft) :
-    tab === "map"  ? mapScreen(acc, camp, m) :
-    tab === "book" ? (camp && camp.pc ? CU.sheetScreen(camp.pc) : bookScreen(acc, camp)) :
-                     settingsScreen(acc, camp, m);
 
-  const where = camp && camp.at ? placeName(nodeById(m, camp.at))
-              : camp && camp.journey ? "on the road"
-              : camp ? camp.name : "";
-
-  $("#app").innerHTML =
-    `<header class="top"><h1>Errantry</h1><span class="sub">${esc(where || "")}</span></header>` +
-    body + tabs(tab);
+  $("#app").innerHTML = html;
+  if (!same) {
+    const scr = $("#app").querySelector(".screen");
+    if (scr) scr.classList.add("fresh");
+  }
+  /* restore before paint, so nothing is ever seen at the wrong offset */
+  window.scrollTo(0, same ? y : 0);
+  lastView = key;
 
   if (tab === "set" && pasteOpen) {
     const box = document.getElementById("pasteBox");
     if (box) box.hidden = false;
+  }
+  /* the map is redrawn from scratch each render, so its gestures have
+     to be re-attached to the new element */
+  if (tab === "map" && !draftPC) {
+    MV.attach($("#app").querySelector(".mapwrap"), id => {
+      camp.focus = (camp.focus === id) ? null : id;
+      render();
+    });
   }
 }
 
@@ -67,8 +100,10 @@ async function signOn(pc, mode) {
   if (camp) await S.saveCampaignNow(camp);
   camp = S.blankCampaign(pc.name, mode);
   camp.pc = pc;
+  MV.resetFit();
   const start = startNode(SURVEY);
   camp.at = start ? start.id : null;
+  if (start) camp.visited = { [start.id]: true };
   S.addLog(camp, `Took up the warrant at ${placeName(start)}.`);
   acc.campaigns.push({ id: camp.id, name: camp.name, deathMode: camp.deathMode, created: camp.created });
   acc.activeCampaign = camp.id;
@@ -116,6 +151,7 @@ on("depart", d => {
   const dest = nodeById(map(), road.from === camp.at ? road.to : road.from);
   if (dest && dest.gate) { toast(dest.gate.note || "The way is shut.", 4500); return; }
   if (camp.bank <= 0) { toast("Nothing in the bank. Go walk."); return; }
+  camp.focus = null;
   S.setOut(camp, road, "foot");
   S.addLog(camp, `Set out for ${placeName(dest)} — ${road.miles} miles.`);
   save(); render();
@@ -128,6 +164,9 @@ on("walk", d => {
   if (res.blocked === "bank-empty") { toast("The bank is empty."); render(); return; }
 
   if (res.arrived) {
+    camp.visited = camp.visited || {};
+    camp.visited[camp.at] = true;
+    camp.focus = null;
     const here = nodeById(map(), camp.at);
     S.addLog(camp, `Reached ${placeName(here)}.`);
     toast(`You arrive at ${placeName(here)}.`);
@@ -140,6 +179,9 @@ on("walk", d => {
 });
 
 on("resolve", () => { S.resolveEncounter(camp, { id: "stub" }); save(); render(); });
+
+on("mzoom", x => { MV.zoomBy(parseFloat(x.f) || 1); render(); });
+on("mfit", () => { MV.resetFit(); render(); });
 
 on("turnback", async () => {
   if (!await confirmAsk("Turn back? The ground you covered still has to be walked home.", "Turn back")) return;
@@ -184,13 +226,39 @@ on("csub", x => { d().subclass = x.id; render(); });
 on("cchoice", x => { d().choice[x.k] = x.id; render(); });
 
 on("cmethod", x => {
-  d().method = x.m;
+  d().method = x.m || null;
+  if (!x.m) { d().pool = []; d().assign = {}; d().holding = null; render(); return; }
   d().assign = {}; d().holding = null; d().bonus = {};
   if (x.m === "array") d().pool = [...CH.STANDARD_ARRAY];
   else if (x.m === "roll") { const a = CH.rollArray(); d().pool = a.scores; d().rolls = a.rolls; }
   else d().pool = [];
   render();
 });
+on("cown", () => {
+  const vals = (d().own || []).map(v => +v);
+  if (vals.length !== 6 || vals.some(n => !Number.isInteger(n) || n < 1 || n > 20)) {
+    toast("Six whole numbers, 1 to 20."); return;
+  }
+  d().pool = vals;
+  d().assign = {}; d().holding = null;
+  render();
+});
+on("cownagain", () => { d().pool = []; d().assign = {}; d().holding = null; render(); });
+
+/* Straight down the sheet in the order they came off the table. */
+on("corder", () => {
+  const order = ["str", "dex", "con", "int", "wis", "cha"];
+  const fixedStr = d().method === "real";
+  d().assign = fixedStr ? { str: 0 } : {};
+  let next = fixedStr ? 1 : 0;
+  for (const ab of order) {
+    if (fixedStr && ab === "str") continue;
+    if (next < d().pool.length) d().assign[ab] = next++;
+  }
+  d().holding = null;
+  render();
+});
+
 on("creroll", () => {
   const a = CH.rollArray();
   d().pool = a.scores; d().rolls = a.rolls; d().assign = {}; d().holding = null;
@@ -334,6 +402,24 @@ on("export", () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
+/* Update the running total and the Take-these button without rebuilding
+   the screen, which would blur the box you're typing in. */
+function ownTotals() {
+  if (!draftPC) return;
+  const vals = draftPC.own || [];
+  const nums = vals.map(v => +v);
+  const ready = vals.length === 6 && vals.every(v => {
+    const n = +v; return v !== "" && Number.isInteger(n) && n >= 1 && n <= 20;
+  });
+  const sum = nums.reduce((t, n) => t + (n || 0), 0);
+  const modSum = nums.reduce((t, n) => t + (n ? Math.floor((n - 10) / 2) : 0), 0);
+  const stats = document.querySelectorAll(".screen .stat .v");
+  if (stats[0]) stats[0].textContent = sum || "—";
+  if (stats[1]) stats[1].textContent = ready ? (modSum >= 0 ? "+" : "") + modSum : "—";
+  const btn = document.querySelector('[data-act="cown"]');
+  if (btn) btn.disabled = !ready;
+}
+
 /* ── boot ─────────────────────────────────────────────────────── */
 async function boot() {
   window.__storeName = store.backendName();
@@ -350,6 +436,7 @@ async function boot() {
     /* an older save may still carry the map inside it — lift it out so
        the campaign starts receiving updates from now on */
     if (camp.map && !camp.mapOverride) delete camp.map;
+    if (!camp.visited) { camp.visited = {}; if (camp.at) camp.visited[camp.at] = true; }
     note = reconcile(camp, mapFor(camp));
     if (note) await S.saveCampaignNow(camp);
   }
@@ -360,6 +447,13 @@ async function boot() {
     if (e.target.id === "cName" && draftPC) draftPC.name = e.target.value;
     if (e.target.id === "cHt" && draftPC) draftPC.real.heightIn = e.target.value;
     if (e.target.id === "cLift" && draftPC) draftPC.real.liftLb = e.target.value;
+    if (e.target.dataset && e.target.dataset.own != null && draftPC) {
+      const i = +e.target.dataset.own;
+      const clean = e.target.value.replace(/[^0-9]/g, "").slice(0, 2);
+      if (e.target.value !== clean) e.target.value = clean;
+      draftPC.own[i] = clean;
+      ownTotals();          /* patch the numbers in place; never re-render mid-typing */
+    }
   });
 
   if (camp) tab = "map";

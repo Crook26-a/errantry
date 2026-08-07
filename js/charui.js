@@ -16,7 +16,7 @@ export function blankDraft() {
   return {
     step: "who", name: "", ancestry: null, klass: null, subclass: null,
     choice: {}, method: null, pool: [], assign: {}, real: { heightIn: "", liftLb: "" },
-    bonus: {}, trade: null, skills: [], expertise: [], cantrips: [], spells: [],
+    bonus: {}, own: ["", "", "", "", "", ""], trade: null, skills: [], expertise: [], cantrips: [], spells: [],
     deathMode: "bonded", rolls: []
   };
 }
@@ -63,7 +63,7 @@ function stepWho(d) {
     <div class="field"><label>Name</label><input id="cName" type="text" value="${esc(d.name)}" placeholder="A carrier" maxlength="28"></div>
     <p class="eyebrow">Kin</p>
     ${R.ANCESTRIES.map(a => `
-      <button class="btn ${d.ancestry === a.id ? "on" : ""}" data-act="canc" data-id="${a.id}">
+      <button class="btn ${d.ancestry === a.id ? "on hascount" : ""}" data-act="canc" data-id="${a.id}">
         ${esc(a.name)}
         <span class="r">${Object.entries(a.asi).map(([k, v]) => R.ABILITIES.find(x => x.id === k).short + "+" + v).join(" ")}</span>
         <span class="sub">${esc(a.note)}</span>
@@ -81,7 +81,7 @@ function stepClass(d) {
   return `
     <h2 class="head">What did they take you on as?</h2>
     ${R.CLASSES.map(c => `
-      <button class="btn ${d.klass === c.id ? "on" : ""}" data-act="ccls" data-id="${c.id}">
+      <button class="btn ${d.klass === c.id ? "on hascount" : ""}" data-act="ccls" data-id="${c.id}">
         ${esc(c.name)} <span class="r">d${c.hitDie}</span>
         <span class="sub">${esc(c.note)}</span>
       </button>`).join("")}
@@ -122,8 +122,33 @@ function stepAbilities(d) {
       <span class="sub">4d6, drop the lowest, six times. Rerolled whole if the set is genuinely cursed.</span></button>
     <button class="btn" data-act="cmethod" data-m="array">The standard array
       <span class="sub">15 14 13 12 10 8. No luck, no regret.</span></button>
+    <button class="btn" data-act="cmethod" data-m="own">Roll your own dice
+      <span class="sub">Four d6, drop the lowest, six times, at your own table. Type in what you get. No safety valve — what you roll is what you carry.</span></button>
     <button class="btn" data-act="cmethod" data-m="real">Use your own body
       <span class="sub">Your height sets your stride, and what you can lift sets your Strength — scored against the adult population, not against a powerlifter. Everything else is still rolled.</span></button>`;
+
+  if (d.method === "own" && !d.pool.length) {
+    const vals = d.own || ["", "", "", "", "", ""];
+    const ready = vals.every(v => { const n = +v; return v !== "" && Number.isInteger(n) && n >= 1 && n <= 20; });
+    const sum = vals.reduce((t, v) => t + (+v || 0), 0);
+    const mods = vals.map(v => v === "" ? null : R.mod(+v));
+    const modSum = mods.reduce((t, m) => t + (m || 0), 0);
+    return `
+    <h2 class="head">What did you roll?</h2>
+    <p class="note">Six scores, in whatever order they came off the table. You'll place them next, so it doesn't matter which is which yet.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px">
+      ${vals.map((v, i) => `<input class="big" style="min-height:64px;font-size:26px" inputmode="numeric"
+        data-own="${i}" value="${esc(v)}" placeholder="—" maxlength="2" aria-label="Score ${i + 1}">`).join("")}
+    </div>
+    <div class="stat"><span class="k">Total</span><span class="v">${sum || "—"}</span></div>
+    <div class="stat"><span class="k">Modifiers add up to</span><span class="v">${ready ? R.modStr(modSum) : "—"}</span></div>
+    <p class="note" style="font-size:13px">${
+      !ready ? "Anything from 1 to 20." :
+      modSum < 1 ? "That's a thin set. The app's own roller would have thrown it back — but it's your table, and your carrier." :
+      Math.max(...vals.map(Number)) >= 17 ? "A good arm on that one." : "A workable set."}</p>
+    <button class="btn primary" data-act="cown" ${ready ? "" : "disabled"} style="text-align:center">Take these</button>
+    <button class="btn quiet" data-act="cmethod" data-m="" style="text-align:center">Choose a different way</button>`;
+  }
 
   if (d.method === "real" && !d.pool.length) return `
     <h2 class="head">Your own measure</h2>
@@ -152,12 +177,11 @@ function stepAbilities(d) {
 
     ${left.length ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">${
       d.pool.map((v, i) => placed.includes(i) ? "" :
-        `<button class="btn ${d.holding === i ? "on" : ""}" data-act="chold" data-i="${i}"
-          style="width:auto;min-width:56px;text-align:center;margin:0;font-family:var(--mono);font-size:18px">${v}</button>`).join("")
+        `<button class="chip ${d.holding === i ? "on" : ""}" data-act="chold" data-i="${i}">${v}</button>`).join("")
     }</div>` : ""}
 
     ${scores.map(s => `
-      <button class="btn ${d.holding != null && s.rolled == null ? "on" : ""}" data-act="cplace" data-ab="${s.a.id}"
+      <button class="btn ${s.rolled != null ? "on hascount" : d.holding != null ? "target" : ""}" data-act="cplace" data-ab="${s.a.id}"
         ${d.method === "real" && s.a.id === "str" ? "disabled" : ""}>
         ${esc(s.a.name)}
         <span class="r">${s.total == null ? "—" : `${s.total} <small style="color:var(--ink-faint)">(${R.modStr(R.mod(s.total))})</small>`}</span>
@@ -166,7 +190,18 @@ function stepAbilities(d) {
       </button>`).join("")}
 
     ${extra ? `<p class="note" style="font-size:13px">${esc(extra.label)} — ${bonusLeft} left to place.</p>` : ""}
-    ${d.method === "roll" ? `<button class="btn quiet" data-act="creroll" style="text-align:center">Roll a fresh set</button>` : ""}
+
+    ${left.length === d.pool.length ? `<button class="btn quiet" data-act="corder" style="text-align:center">Take them straight down
+      <span class="sub" style="text-align:center">In the order rolled — Strength first, Charisma last. The old way.</span></button>` : ""}
+
+    ${d.method === "roll" && d.rolls.length ? `<p class="eyebrow">The dice</p>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--ink-soft);line-height:1.9">${
+        d.rolls.map((r, i) => `<div>${String(r.total).padStart(2)} &nbsp;<span style="color:var(--ink-faint)">${
+          r.dice.join(" ")} <s style="opacity:.5">${r.dropped.join(" ")}</s></span></div>`).join("")
+      }</div>` : ""}
+
+    ${d.method === "roll" ? `<button class="btn quiet" data-act="creroll" style="text-align:center;margin-top:10px">Roll a fresh set</button>` : ""}
+    ${d.method === "own" ? `<button class="btn quiet" data-act="cownagain" style="text-align:center">Type different scores</button>` : ""}
     <button class="btn primary" data-act="cnext" ${done && bonusLeft === 0 ? "" : "disabled"} style="margin-top:10px;text-align:center">Carry on</button>`;
 }
 
@@ -176,7 +211,7 @@ function stepTrade(d) {
     <h2 class="head">What were you before?</h2>
     <p class="note">Everyone was something. It's worth two skills and whatever you kept.</p>
     ${R.TRADES.map(t => `
-      <button class="btn ${d.trade === t.id ? "on" : ""}" data-act="ctrade" data-id="${t.id}">
+      <button class="btn ${d.trade === t.id ? "on hascount" : ""}" data-act="ctrade" data-id="${t.id}">
         ${esc(t.name)}
         <span class="r">${t.skills.map(s => R.skillById(s).name).join(", ")}</span>
         <span class="sub">${esc(t.note)}</span>
@@ -205,7 +240,7 @@ function stepSkills(d) {
       const s = R.skillById(id);
       const isFree = free.includes(id);
       const on = d.skills.includes(id);
-      return `<button class="btn ${on ? "on" : ""}" data-act="cskill" data-id="${id}" ${isFree || (left <= 0 && !on) ? "disabled" : ""}>
+      return `<button class="btn ${on ? "on hascount" : ""}" data-act="cskill" data-id="${id}" ${isFree || (left <= 0 && !on) ? "disabled" : ""}>
         ${esc(s.name)} <span class="r">${R.ABILITIES.find(a => a.id === s.ab).short}</span>
         ${isFree ? `<span class="sub">already yours</span>` : ""}</button>`;
     }).join("")}

@@ -95,6 +95,7 @@ export function blankCampaign(name, deathMode) {
     map: null,         // the survey, pasted in
     flags: {},
     cleared: {},       // sites dealt with
+    visited: {},       // places walked to, for the map
     log: []            // road log, newest first
   };
 }
